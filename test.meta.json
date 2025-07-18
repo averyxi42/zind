@@ -1,0 +1,26 @@
+{
+    "origin": [
+        -1.4772657450337388,
+        -3.4839156005513887
+    ],
+    "resolution": 0.05,
+    "id_to_name_map": {
+        "2": "Room_0",
+        "3": "entry",
+        "4": "Room_2",
+        "5": "bathroom",
+        "6": "living room",
+        "7": "breakfast nook",
+        "8": "dining room",
+        "9": "kitchen",
+        "10": "hallway",
+        "11": "Room_5",
+        "12": "Room_6",
+        "13": "living room",
+        "14": "dining room",
+        "15": "Room_8",
+        "16": "Room_9",
+        "17": "patio",
+        "18": "Room_11"
+    }
+}
