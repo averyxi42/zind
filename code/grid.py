@@ -782,6 +782,7 @@ def visualize_raster_map(grid_map, metadata, filename, save_path=None):
         plt.tight_layout(pad=0.5)
         plt.savefig(save_path, format='jpeg', quality=95, bbox_inches='tight', pad_inches=0.1)
         plt.close(fig) # Essential for freeing memory in a batch process
+
     else:
         plt.tight_layout()
         plt.show()
@@ -820,6 +821,8 @@ def main():
             meta_p = output_p.with_suffix('.meta.json');
             with open(meta_p, 'w') as f: json.dump(metadata, f, indent=4)
             print(f"Step 4: Saved outputs to {output_p} and {meta_p}")
+            import pickle
+            with open(output_p.with_suffix('.vector.pkl'),'wb') as f: pickle.dump(final_vector_layout,f)
 
         if not args.save_visualizations:
             raster_save_path = None
