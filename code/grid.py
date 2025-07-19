@@ -76,14 +76,14 @@ def _get_adjacent_regions(piece, candidates):
     neighbors = []
     # --- CRITICAL FIX: Apply a small buffer to the piece to bridge precision gaps ---
     # This ensures that pieces that are "supposed" to touch will be found as neighbors.
-    buffered_piece = piece.buffer(1e-9)
+    buffered_piece = piece.buffer(0.01)
     
     for i, region in enumerate(candidates):
         # Check for intersection against the buffered piece
         if buffered_piece.intersects(region):
             try:
                 # The boundary length is still calculated on the original piece for accuracy
-                boundary_len = piece.intersection(region).length
+                boundary_len = buffered_piece.intersection(region).length
                 # Only consider it a neighbor if there's a meaningful shared boundary
                 if boundary_len > 1e-6:
                     neighbors.append({'index': i, 'boundary': boundary_len})
@@ -425,7 +425,7 @@ def _subdivide_and_label_rooms(redraw_rooms, redraw_pins, raw_rooms, merge_slive
     
     return final_regions, []
 # --- Add these new imports to the Dependency Checks section ---
-from skimage.morphology import binary_dilation, disk as sk_disk
+from skimage.morphology import binary_dilation, binary_erosion,disk as sk_disk
 from skimage.draw import disk
 from skimage.measure import find_contours
 
@@ -440,7 +440,7 @@ def _run_hybrid_fmm(master_shape, all_pins_in_room, guiding_polygons: list):
     # 1. Adaptive Discretization
     bounds = master_shape.bounds
     diag_len = math.sqrt((bounds[2] - bounds[0])**2 + (bounds[3] - bounds[1])**2)
-    resolution = np.clip(diag_len / 1000.0, 0.02, 0.1)
+    resolution = np.clip(diag_len / 2000.0, 0.005, 0.1)
     min_coords = np.array([bounds[0], bounds[1]])
     grid_dims = (np.ceil((np.array([bounds[2], bounds[3]]) - min_coords) / resolution)).astype(int)
     grid_height, grid_width = grid_dims[1], grid_dims[0]
@@ -612,7 +612,7 @@ def _perform_merging(base_regions, pieces_to_merge):
         num_neighbors_to_merge = 2 if len(neighbors) >= 2 else len(neighbors)
         for i in range(num_neighbors_to_merge):
             neighbor_index = neighbors[i]['index']
-            merger_map[neighbor_index].append(piece)
+            merger_map[neighbor_index].append(piece.buffer(0.001))
     
     # 3. After all adjacency is determined, perform the actual unions.
     final_layout = []
