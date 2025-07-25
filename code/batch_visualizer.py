@@ -57,6 +57,8 @@ def main():
         action="store_true",
         help="Print the commands that would be executed without running them."
     )
+
+    par
     args = parser.parse_args()
 
     # --- Validate Paths ---

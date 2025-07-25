@@ -1,3 +1,5 @@
+# Processing
+python3 code/parallel_processor.py ./data code/grid.py --merge_unlabeled --viz_vector --save_visualizations --force_overwrite --resolution 0.1
 # Zillow Indoor Dataset (ZInD)
 
 ![ZInD](assets/teaser_final.png)

@@ -631,13 +631,69 @@ def _perform_merging(base_regions, pieces_to_merge):
 
     return final_layout
 
+# --- Add this new import to the Dependency Checks section ---
+from shapely.affinity import scale as shapely_scale
+
+# --- ADD THESE IMPORTS AT THE TOP OF THE SCRIPT ---
+import json
+
+# --- THIS SNIPPET REPLACES THE FLAWED SCALING LOGIC ---
+# Place this at the beginning of the generate_final_vector_layout function.
 def generate_final_vector_layout(fp: FloorPlan, merge_unlabeled: bool, subdivision_method: str):
-    floor_id = list(fp.floor_plan_layouts.get("redraw").keys())[0]
+    
+    print("......checking for floor plan scale...")
+    
+    # --- CORRECTED SCALING LOGIC (FEW-LINER) ---
+    with open(fp._json_file_name, 'r') as f:
+        top_level_json = json.load(f)
+    
+    scale_data = top_level_json.get("scale_meters_per_coordinate", {})
+    # Find the first valid floor_id and its non-null scale from the dictionary
+    floor_id, scale = next(((fid, s) for fid, s in scale_data.items() if s is not None), (None, 1.0))
+    if floor_id is None:
+        # If no valid scaled floor is found, fall back to the first available redraw key.
+        print("......no scale information found. Assuming 1.0 meters/unit.")
+        if fp.floor_plan_layouts.get("redraw"):
+            floor_id = list(fp.floor_plan_layouts.get("redraw").keys())[0]
+        else:
+            raise ValueError("Could not find any valid floor ID to process in the 'redraw' layout.")
+
     all_redraw, all_raw = fp.floor_plan_layouts["redraw"][floor_id], fp.floor_plan_layouts.get("raw", {}).get(floor_id, [])
-    redraw_rooms = [to_shapely(p) for p in all_redraw if p.type == PolygonType.ROOM]
-    redraw_pins = [p for p in all_redraw if p.type == PolygonType.PIN_LABEL]
-    raw_rooms = [to_shapely(p) for p in all_raw if p.type == PolygonType.ROOM]
-    doors = [p for p in all_redraw if p.type == PolygonType.DOOR]
+
+    # Extract all geometric data into Shapely objects
+    redraw_rooms_original = [to_shapely(p) for p in all_redraw if p.type == PolygonType.ROOM]
+    redraw_pins_original = [p for p in all_redraw if p.type == PolygonType.PIN_LABEL]
+    raw_rooms_original = [to_shapely(p) for p in all_raw if p.type == PolygonType.ROOM]
+    doors_original = [p for p in all_redraw if p.type == PolygonType.DOOR]
+
+    # Apply the scale transformation to all geometries
+    if scale != 1.0:
+        print(f"......applying scale factor of {scale:.4f} to all geometry.")
+        redraw_rooms = [shapely_scale(p, xfact=scale, yfact=scale, origin=(0,0)) for p in redraw_rooms_original]
+        raw_rooms = [shapely_scale(p, xfact=scale, yfact=scale, origin=(0,0)) for p in raw_rooms_original]
+        doors_scaled = []
+        for p in doors_original:
+            # Scale the points of the door polygon individually
+            scaled_points = [ShapelyPoint(pt.x * scale, pt.y * scale) for pt in p.points]
+            # Recreate a new Polygon object with the scaled points
+            # We need to preserve the other attributes like 'name' from the original
+            scaled_door_poly = Polygon(name=p.name, type=p.type, points=scaled_points)
+            doors_scaled.append(scaled_door_poly)
+        doors = doors_scaled
+        
+        pins_scaled = []
+        for p in redraw_pins_original:
+            scaled_points = [ShapelyPoint(pt.x * scale, pt.y * scale) for pt in p.points]
+            scaled_pin_poly = Polygon(name=p.name, type=p.type, points=scaled_points)
+            pins_scaled.append(scaled_pin_poly)
+        redraw_pins = pins_scaled
+    else:
+        # If scale is 1.0, just use the original objects
+        redraw_rooms = redraw_rooms_original
+        raw_rooms = raw_rooms_original
+        doors = doors_original
+        redraw_pins = redraw_pins_original
+    # --- END OF SCALING FIX ---
     base_regions, unmerged_slivers = _subdivide_and_label_rooms(redraw_rooms, redraw_pins, raw_rooms, merge_unlabeled, subdivision_method)
     door_hulls = _find_and_pair_doorways(doors)
     if merge_unlabeled: return _perform_merging(base_regions, door_hulls), redraw_pins
@@ -829,6 +885,7 @@ def main():
         if args.save_visualizations:
                 if not args.output_path: print("\n[Error] --output_path must be specified with --save_visualizations\n"); sys.exit(1)
                 output_p = Path(args.output_path); raster_save_path = output_p.with_name(output_p.stem + "_raster.jpeg")
+        plt.imshow(grid_map)
         print("Step 5: Launching final grid map visualization..."); visualize_raster_map(grid_map, metadata, Path(args.json_filepath).name, save_path=raster_save_path)
     except Exception as e:
         print(f"\nAn unexpected error occurred: {e}"); import traceback; traceback.print_exc(); sys.exit(1)
